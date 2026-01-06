@@ -1,0 +1,17 @@
+{
+    "github": {
+        "token": "",
+        "repositories": [
+            {
+                "name": "GitFlowDashboard",
+                "owner": "mukadeshinigami",
+                "branch": "main",
+                "enabled": true
+            }
+        ]
+    },
+    "poll_interval": 60,
+    "storage": {
+        "data_dir": "./data"
+    }
+}
