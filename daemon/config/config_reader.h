@@ -25,9 +25,6 @@ typedef struct {
     char* data_dir; // директория для хранения данных
 } Config;    
 
-
-
-
 // Получить GitHub токен с приоритетом (env > json)
 // Возвращает указатель на токен или NULL, если не найден
 const char* get_github_token(const char* token_from_json);
@@ -40,5 +37,4 @@ Config* load_config(const char* config_path);
 // Освободить память, выделенную для конфигурации
 void free_config(Config* config);
 
-#endif
-
+#endif // CONFIG_READER_H

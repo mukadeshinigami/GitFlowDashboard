@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include "config_reader.h"
 #include "../../shared/libs/cjson/cJSON.h"
 
@@ -22,7 +21,7 @@ static char* read_file(const char* filepath) {
         return NULL;
     }
 
-    char* file_content = malloc(file_size + 1);
+    char* file_content = malloc(file_size + 1); 
     if (file_content == NULL) {
         fclose(file);
         return NULL;
@@ -129,40 +128,7 @@ const char* get_github_token(const char* token_from_json) {
     return NULL;
 }
 
-Config* load_config(const char* config_path) {
-    // Читаем файл
-    char* file_contents = read_file(config_path);
-    if (file_contents == NULL) {
-        return NULL;
-    }
-
-    // Парсим JSON
-    cJSON* json = cJSON_Parse(file_contents);
-    free(file_contents);  // Освобождаем сразу после парсинга
-
-    if (json == NULL) {
-        const char* error_ptr = cJSON_GetErrorPtr();
-        if (error_ptr != NULL) {
-            fprintf(stderr, "[ERROR] JSON parse error: %s\n", error_ptr);
-        }
-        return NULL;
-    }
-
-    // Выделяем память для конфигурации
-    Config* config = calloc(1, sizeof(Config));
-    if (config == NULL) {
-        fprintf(stderr, "[ERROR] Failed to allocate memory for config\n");
-        cJSON_Delete(json);
-        return NULL;
-    }
-
-    // Инициализируем значения по умолчанию
-    config->repositories = NULL;
-    config->repositories_count = 0;
-    config->poll_interval = 60;
-    config->data_dir = NULL;
-
-    // Парсим github.token
+static int parse_github_token(cJSON* json, Config* config) {
     cJSON* github = cJSON_GetObjectItem(json, "github");
     const char* token_from_json = "";
     
@@ -173,58 +139,64 @@ Config* load_config(const char* config_path) {
         }
     }
 
-    // Используем существующую функцию get_github_token
-    const char* token_from_env = get_github_token(token_from_json);
-    if (token_from_env) {
-        config->github_token = strdup(token_from_env);
-        if (config->github_token == NULL) {
-            fprintf(stderr, "[ERROR] Failed to allocate memory for token\n");
-            cJSON_Delete(json);
-            free_config(config);
-            return NULL;
-        }
-    } else {
-        fprintf(stderr, "[ERROR] Failed to get GitHub token\n");
-        cJSON_Delete(json);
-        free_config(config);
-        return NULL;
+    const char* token = get_github_token(token_from_json);
+    if (!token) {
+        return -1;
     }
 
-    // Парсим poll_interval
+    config->github_token = strdup(token);
+    if (!config->github_token) {
+        fprintf(stderr, "[ERROR] Failed to allocate memory for token\n");
+        return -1;
+    }
+    return 0;
+}
+
+static void parse_poll_interval(cJSON* json, Config* config) {
     cJSON* poll_interval_json = cJSON_GetObjectItem(json, "poll_interval");
     if (cJSON_IsNumber(poll_interval_json)) {
         config->poll_interval = poll_interval_json->valueint;
     }
+}
 
-    // Парсим storage.data_dir
+static int parse_storage_data_dir(cJSON* json, Config* config) {
     cJSON* storage = cJSON_GetObjectItem(json, "storage");
-    if (cJSON_IsObject(storage)) {
-        cJSON* data_dir_json = cJSON_GetObjectItem(storage, "data_dir");
-        if (cJSON_IsString(data_dir_json)) {
-            config->data_dir = strdup(data_dir_json->valuestring);
-            if (config->data_dir == NULL) {
-                fprintf(stderr, "[ERROR] Failed to allocate memory for data_dir\n");
-                cJSON_Delete(json);
-                free_config(config);
-                return NULL;
-            }
-        }
+    if (!cJSON_IsObject(storage)) {
+        return 0;
     }
 
-    // Парсим github.repositories
-    if (cJSON_IsObject(github)) {
-        cJSON* repos_json = cJSON_GetObjectItem(github, "repositories");
-        if (repos_json != NULL) {
-            if (parse_repositories(repos_json, config) != 0) {
-                fprintf(stderr, "[ERROR] Failed to parse repositories\n");
-                cJSON_Delete(json);
-                free_config(config);
-                return NULL;
-            }
-        }
+    cJSON* data_dir_json = cJSON_GetObjectItem(storage, "data_dir");
+    if (!cJSON_IsString(data_dir_json)) {
+        return 0;
     }
 
-    // Выводим информацию о загруженной конфигурации
+    config->data_dir = strdup(data_dir_json->valuestring);
+    if (!config->data_dir) {
+        fprintf(stderr, "[ERROR] Failed to allocate memory for data_dir\n");
+        return -1;
+    }
+    return 0;
+}
+
+static int parse_github_repositories(cJSON* json, Config* config) {
+    cJSON* github = cJSON_GetObjectItem(json, "github");
+    if (!cJSON_IsObject(github)) {
+        return 0;
+    }
+
+    cJSON* repos_json = cJSON_GetObjectItem(github, "repositories");
+    if (!repos_json) {
+        return 0;
+    }
+
+    if (parse_repositories(repos_json, config) != 0) {
+        fprintf(stderr, "[ERROR] Failed to parse repositories\n");
+        return -1;
+    }
+    return 0;
+}
+
+static void print_config_info(const Config* config) {
     printf("[CONFIG] GitHub token: %s\n", config->github_token);
     printf("[CONFIG] Poll interval: %d seconds\n", config->poll_interval);
     printf("[CONFIG] Storage data dir: %s\n", 
@@ -238,7 +210,58 @@ Config* load_config(const char* config_path) {
                config->repositories[i].branch,
                config->repositories[i].enabled ? "yes" : "no");
     }
+}
 
+Config* load_config(const char* config_path) {
+    char* file_contents = read_file(config_path);
+    if (!file_contents) {
+        return NULL;
+    }
+
+    cJSON* json = cJSON_Parse(file_contents);
+    free(file_contents);
+
+    if (!json) {
+        const char* error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr) {
+            fprintf(stderr, "[ERROR] JSON parse error: %s\n", error_ptr);
+        }
+        return NULL;
+    }
+
+    Config* config = calloc(1, sizeof(Config));
+    if (!config) {
+        fprintf(stderr, "[ERROR] Failed to allocate memory for config\n");
+        cJSON_Delete(json);
+        return NULL;
+    }
+
+    config->repositories = NULL;
+    config->repositories_count = 0;
+    config->poll_interval = 60;
+    config->data_dir = NULL;
+
+    if (parse_github_token(json, config) != 0) {
+        cJSON_Delete(json);
+        free_config(config);
+        return NULL;
+    }
+
+    parse_poll_interval(json, config);
+
+    if (parse_storage_data_dir(json, config) != 0) {
+        cJSON_Delete(json);
+        free_config(config);
+        return NULL;
+    }
+
+    if (parse_github_repositories(json, config) != 0) {
+        cJSON_Delete(json);
+        free_config(config);
+        return NULL;
+    }
+
+    print_config_info(config);
     cJSON_Delete(json);
     return config;
 }
@@ -247,7 +270,9 @@ void free_config(Config* config) {
     /*
     Освобождаем память, выделенную для конфигурации
     */
-    if (config == NULL) return;
+    if (config == NULL) {
+        return;
+    }
 
     free(config->github_token);
 

@@ -1,0 +1,29 @@
+CompileFlags:
+  Add:
+    - -I/home/mukadeshinigami/Code/GitFlowDashboard/daemon
+    - -I/home/mukadeshinigami/Code/GitFlowDashboard/daemon/config
+    - -I/home/mukadeshinigami/Code/GitFlowDashboard/shared/libs/cjson
+    - -D_POSIX_C_SOURCE=200809L
+  Remove:
+    - -W*
+    - -w
+    - -std=*
+
+---
+If:
+  PathMatch: .*\.(c|h)$
+CompileFlags:
+  Add:
+    - -x
+    - c
+    - -std=c11
+
+Diagnostics:
+  ClangTidy:
+    Add:
+      - readability-*
+      - performance-*
+    Remove:
+      - readability-magic-numbers
+      - readability-uppercase-literal-suffix
+      - readability-identifier-length
