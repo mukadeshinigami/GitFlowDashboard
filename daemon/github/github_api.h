@@ -1,69 +1,68 @@
-#ifndef GITHUB_API_H
-#define GITHUB_API_H
-
 #include <stdbool.h>
 
-/*
- * Структура для хранения информации о репозитории GitHub
- */
 typedef struct {
-    char* name;              // Название репозитория
-    char* full_name;         // Полное имя (owner/repo)
-    char* description;       // Описание
-    char* owner;             // Владелец репозитория
-    char* default_branch;    // Ветка по умолчанию
-    int stars;               // Количество звезд
-    int forks;               // Количество форков
-    bool is_private;         // Приватный ли репозиторий
+    char* name;
+    char* owner;
+    char* full_name;
+    char* description;
+    char* default_branch;
+    int stars;
+    int forks;
+    bool is_private; // 0 - public, 1 - private
 } GitHubRepository;
 
-/*
- * Инициализация модуля GitHub API
- * Должна быть вызвана перед использованием других функций
- * Возвращает 0 при успехе, -1 при ошибке
- */
+typedef struct {
+    // === Идентификация ===
+    int id;                  // "id": 1
+    int number;              // "number": 1347
+
+    // === Основное содержимое ===
+    char* title;             // "title": "Amazing new feature"
+    char* body;              // "body": "Please pull these..."
+    char* state;             // "state": "open" | "closed"
+    bool draft;              // "draft": false (добавь если есть)
+    bool locked;             // "locked": true
+
+    // === Автор (из user объекта) ===
+    char* user_login;        // "user.login": "octocat"
+    char* user_avatar_url;   // "user.avatar_url" (для UI)
+
+    // === Ветки (из head/base объектов) ===
+    char* head_ref;          // "head.ref": "new-topic"
+    char* head_sha;          // "head.sha": "6dcb09b5..." (для статусов)
+    char* base_ref;          // "base.ref": "master"
+
+    // === Временные метки ===
+    char* created_at;        // "created_at"
+    char* updated_at;        // "updated_at"
+    char* closed_at;         // "closed_at" (может быть NULL)
+    char* merged_at;         // "merged_at" (может быть NULL)
+
+    // === Ссылки ===
+    char* html_url;          // "html_url" — для открытия в браузере
+
+    // === Метки (опционально для MVP) ===
+    char** labels;           // массив строк из labels[].name
+    int labels_count;
+} GitHubPullRequest;
+
+typedef struct {
+
+} GitHubIssue;
+
 int github_api_init(void);
 
-/*
- * Очистка ресурсов модуля GitHub API
- * Должна быть вызвана в конце работы программы
- */
 void github_api_cleanup(void);
 
-/*
- * Выполнить GET-запрос к GitHub API
- * 
- * Параметры:
- *   url - полный URL запроса (например: "https://api.github.com/repos/owner/repo")
- *   token - токен авторизации (может быть NULL для публичных запросов)
- * 
- * Возвращает:
- *   Указатель на строку с JSON-ответом (нужно освободить через free())
- *   NULL при ошибке
- */
-char* github_api_get(const char* url, const char* token);
-
-/*
- * Получить информацию о репозитории
- * 
- * Параметры:
- *   owner - владелец репозитория
- *   repo - название репозитория
- *   token - токен авторизации
- * 
- * Возвращает:
- *   Указатель на GitHubRepository (нужно освободить через github_repository_free())
- *   NULL при ошибке
- */
-GitHubRepository* github_get_repository(const char* owner, const char* repo, const char* token);
-
-/*
- * Освободить память, выделенную для GitHubRepository
- */
-void github_repository_free(GitHubRepository* repo);
-
-#endif // GITHUB_API_H
-
-
-
-
+GitHubRepository* github_get_repository(const char* owner, const char* repo, const char* token); /*
+    Получает информацию о репозитории
+*/
+void github_repository_free(GitHubRepository* repo); /*
+    Освобождает память, выделенную для репозитория
+*/
+GitHubPullRequest* github_get_pull_request(const char* owner, const char* repo, const char* token, int pull_request_id); /*
+    Получает информацию о pull request
+*/
+void github_pull_request_free(GitHubPullRequest* pull_request); /*
+    Освобождает память, выделенную для pull request
+*/
