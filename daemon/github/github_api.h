@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stddef.h>
 
 typedef struct {
     char* name;
@@ -46,9 +47,11 @@ typedef struct {
     int labels_count;
 } GitHubPullRequest;
 
-typedef struct {
 
-} GitHubIssue;
+typedef struct {    
+    char* response;
+    size_t size;
+} MemoryChunk;
 
 int github_api_init(void);
 
