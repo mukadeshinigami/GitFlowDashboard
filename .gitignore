@@ -58,6 +58,7 @@ vgcore.*
 
 # Cursor
 .cursor/
+.cursorrules
 
 # JetBrains IDEs
 .idea/
